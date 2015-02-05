@@ -1,0 +1,32 @@
+* PHash-hs
+Haskell bindings for the [[phash.org]] library.
+
+Command line utilities (using [[http://arxiv.org/abs/1403.0749][Free Applicative Functors]] for option
+parsing) for loading images into a PHash tree, and querying a built
+tree.
+
+Note that the current query implementation is just a linear scan.
+** Usage
+*** Haskell
+#+begin_src haskell
+  hammingDistance :: PHash -> PHash -> Distance
+  imageHash :: FilePath -> IO (Maybe PHash)
+  topMatches :: PHashTree -> PHash -> Distance -> [(FilePath, Distance)]
+  buildTree :: FilePath -> IO PHashTree
+#+end_src
+*** Command Line Utilities
+**** Build a tree
+#+begin_src sh
+  PHash \
+      build \
+      --base-directory ~/src/phash-hs/test/ \
+      --serialized tree.ser
+#+end_src
+**** Query a tree
+#+begin_src sh
+  .cabal-sandbox/bin/PHash \
+      query \
+      --image test/300px-Buzo.jpg \
+      --serialized tree.ser \
+      --threshold 15
+#+end_src
