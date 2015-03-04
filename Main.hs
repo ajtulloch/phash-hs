@@ -1,18 +1,16 @@
-{-# LANGUAGE RecordWildCards     #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
+{-# LANGUAGE RecordWildCards #-}
 module Main(main) where
 
 import           PHash
 
 import           Control.Applicative
+import           Control.Monad
 import qualified Data.ByteString     as BS
 import           Data.Maybe
 import           Data.Serialize
 import           Options.Applicative
 import           System.Log.Logger
 import           Text.Printf
-
 
 data Command = Build BuildOptions | Query QueryOptions
 data BuildOptions = BuildOptions {baseDir :: FilePath, serializeTo :: FilePath}
@@ -61,11 +59,11 @@ run (Build (BuildOptions{..})) = do
   BS.writeFile serializeTo (encode tree)
 run (Query (QueryOptions{..})) = do
   serialized <- BS.readFile deserializeFrom
-  (query :: PHash) <- fromJust <$> imageHash image
-  let Right (tree :: PHashTree) = decode serialized
+  query <- fromJust <$> imageHash image
+  let Right tree = decode serialized
   infoM loggerName $ printf "Loaded tree with %d entries" (numEntries tree)
   debugM loggerName (show tree)
-  mapM_ (\(p, Distance d) -> putStr (printf "%d: %s\n" d p :: String)) (topMatches tree query threshold)
+  forM_ (topMatches tree query threshold) (\(p, Distance d) -> putStr (printf "%d: %s\n" d p :: String))
 
 main :: IO ()
 main = do

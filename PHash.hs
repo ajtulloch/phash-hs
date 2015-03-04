@@ -1,10 +1,11 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE ForeignFunctionInterface   #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TupleSections              #-}
 module PHash(PHash, PHashTree(..), numEntries, buildTree, imageHash, topMatches, Distance(..)) where
 
 import           Control.Applicative
+import           Control.Monad
 import           Data.Function
 import           Data.List
 import           Data.Maybe
@@ -42,7 +43,10 @@ hammingDistance l r = Distance $ fromIntegral x
       toCPHash (PHash y) = CULong y
 
 imageHash :: FilePath -> IO (Maybe PHash)
-imageHash path = withCString path $ \cs -> with (CULong 0) $ \pHPtr -> c_ph_dct_imagehash cs pHPtr >>= handle pHPtr
+imageHash path = withCString path $ \cs ->
+                 with (CULong 0) $ \pHPtr -> do
+                   h <- c_ph_dct_imagehash cs pHPtr
+                   handle pHPtr h
     where
       handle _ (CInt (-1)) = return Nothing
       handle pHPtr _ = Just . fromCPHash <$> peek pHPtr
@@ -61,7 +65,7 @@ imagesInDir :: FilePath -> IO [FilePath]
 imagesInDir dir = do
   contents <- getDirectoryContents dir
   let filtered = filter (\d -> takeExtension d `elem` [".jpg", ".png"]) contents
-  mapM (\p -> canonicalizePath (dir </> p)) filtered
+  forM filtered (\p -> canonicalizePath (dir </> p))
 
 hashesToTree :: [(Maybe PHash, FilePath)] -> PHashTree
 hashesToTree = PHashTree . V.fromList . mapMaybe valid
@@ -70,7 +74,12 @@ hashesToTree = PHashTree . V.fromList . mapMaybe valid
       valid (Nothing, _) = Nothing
 
 extractHashes :: FilePath -> IO [(Maybe PHash, FilePath)]
-extractHashes baseDir = mapM (\p -> do {h <- imageHash p; return (h, p)}) =<< imagesInDir baseDir
+extractHashes baseDir = do
+  images <- imagesInDir baseDir
+  forM images $ \p -> do
+    h <- imageHash p
+    return (h, p)
+
 
 buildTree :: FilePath -> IO PHashTree
 buildTree baseDir = hashesToTree <$> extractHashes baseDir
